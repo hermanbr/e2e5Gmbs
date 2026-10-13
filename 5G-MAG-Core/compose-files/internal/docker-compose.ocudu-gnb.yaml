@@ -42,7 +42,7 @@ services:
     container_name: ocudu_gnb_with_mbs
     image: ocudu/gnb:mbs-local
     build:
-      context: ../../../ocudu
+      context: ../../../OCUDU-gNB
       dockerfile: docker/Dockerfile
       args:
         OS: ${OCUDU_GNB_OS:-ubuntu}

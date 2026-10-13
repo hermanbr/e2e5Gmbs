@@ -3,3 +3,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Virtual MBS testbed runtime logs (gNB log/pcaps)
+logs/

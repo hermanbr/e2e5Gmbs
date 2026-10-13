@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GNB_BIN="$(readlink -f "$SCRIPT_DIR/../ocudu/build/apps/gnb/gnb")"
+GNB_BIN="$(readlink -f "$SCRIPT_DIR/../OCUDU-gNB/build/apps/gnb/gnb")"
 GNB_CFG="$SCRIPT_DIR/ocudu-host-gnb-b210.yml"
 
 if [[ ! -x "$GNB_BIN" ]]; then

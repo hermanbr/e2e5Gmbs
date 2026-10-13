@@ -4,7 +4,7 @@ cu_cp:
   amf:
     addrs: amf-with-mbs.5g-mag.org
     port: 38412
-    bind_addrs: 10.33.33.10
+    bind_addrs: 10.33.33.16
     supported_tracking_areas:
       - tac: 1
         plmn_list:
@@ -16,16 +16,16 @@ cu_cp:
 
 ru_sdr:
   device_driver: zmq
-  device_args: tx_port=tcp://10.33.33.10:2000,rx_port=tcp://10.33.33.11:2001,base_srate=23.04e6
+  device_args: tx_port=tcp://10.33.33.16:2000,rx_port=tcp://10.33.33.30:2001,base_srate=23.04e6
   srate: 23.04
-  tx_gain: 75
-  rx_gain: 75
+  tx_gain: 25
+  rx_gain: 25
 
 cell_cfg:
-  dl_arfcn: 368500
-  band: 3
+  dl_arfcn: 632628
+  band: 78
   channel_bandwidth_MHz: 20
-  common_scs: 15
+  common_scs: 30
   plmn: "99970"
   tac: 1
   pci: 1
@@ -35,7 +35,6 @@ cell_cfg:
   pdcch:
     common:
       ss0_index: 0
-      coreset0_index: 12
     dedicated:
       ss2_type: common
       dci_format_0_1_and_1_1: false

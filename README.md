@@ -712,6 +712,35 @@ local OAI build path. Keep these items consistent across UEs:
 - Matching RF band/frequency/numerology.
 - MBS G-RNTI `0xfe01`.
 
+## Virtual Testbed (ZMQ, no SDR)
+The whole chain can also run on one host without radios: the OCUDU gNB and
+several OAI nrUEs exchange IQ samples over ZMQ. A ZMQ link only connects two
+endpoints, so `tools/zmq-broker` sits in between: it copies every downlink
+sample block to all UEs and sums the UEs' uplink samples for the gNB.
+```text
+OCUDU gNB 10.33.33.16 --DL :2000--> zmq_broker 10.33.33.30 --DL :2100/:2101--> oai_nrue_1 .31 / oai_nrue_2 .32
+                      <--UL :2001--                        <--UL ue:2001-------
+```
+The cell is band 78, ARFCN 632628, 30 kHz, 20 MHz, 23.04 Msps
+(`configs/internal/ocudu_gnb_mbs_zmq.yml`), matching OAI's
+`ci-scripts/yaml_files/5g_zmq_radio_1x1_ocudu`.
+```bash
+cd ~/e2e5Gmbs/docs
+./virtual-mbs.sh build      # OAI nrUE image (oai-nr-ue:mbs-local), OCUDU gNB, broker
+./virtual-mbs.sh up         # core + subscribers, then broker, gNB and UEs
+./virtual-mbs.sh logs zmq_broker
+./virtual-mbs.sh activate   # MBS session + text sender; MODE=video for video
+nc -ul 5001                 # MBS payload from UE1 (UE2: 5002); video: ffplay udp://0.0.0.0:5001
+./virtual-mbs.sh down
+```
+The ZMQ links cannot reconnect, so always restart the stack as a whole. To add a
+UE, copy an `oai_nrue_N` block in
+`compose-files/internal/docker-compose.virtual-mbs.yaml` (new IP, IMSI conf, UDP
+port, broker port), add a `--ue-dl-bind`/`--ue-tx` pair to `zmq_broker` and add
+the IMSI and service to `UE_IMSIS`/`UE_SERVICES`. Each UE processes the full sample stream, so CPU cores
+are the limit. On hosts with fewer than 8 cores, set `OCUDU_GNB_CPUSET` (for
+example `OCUDU_GNB_CPUSET=0-3`).
+
 ## Verification Checklist
 Core state:
 ```bash
