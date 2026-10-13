@@ -31,11 +31,11 @@ compose() {
 }
 
 build_oai_nrue() {
-  # Official OAI multi-stage images; ran-build already compiles the ZMQ radio (liboai_zmqdevif.so).
+  # OAI's dependency image, then a lean nrUE + ZMQ build (not OAI's full ran-build with -Werror).
   cd "$ROOT/oai-ue"
   docker build --target ran-base -t ran-base:latest -f docker/Dockerfile.base.ubuntu .
-  docker build --target ran-build -t ran-build:latest -f docker/Dockerfile.build.ubuntu .
-  docker build --target oai-nr-ue -t oai-nr-ue:mbs-local -f docker/Dockerfile.nrUE.ubuntu .
+  docker build --build-arg NUM_JOBS="${OAI_NUM_JOBS:-$(nproc)}" \
+    -t oai-nr-ue:mbs-local -f docker/Dockerfile.nrUE.zmq.ubuntu .
 }
 
 provision_subscribers() {
