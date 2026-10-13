@@ -69,7 +69,8 @@ An **OCUDU** gNB (derived from srsRAN Project) with added MBS support: it
 accepts broadcast sessions from the AMF, joins the multicast tunnel and
 schedules the content on the **MTCH** using group radio ID (**G-RNTI**)
 `0xfe01`. Its radio driver is set to **ZMQ** instead of a USRP (UHD). Built
-locally into the image `ocudu/gnb:mbs-local`.
+locally (only the `gnb` app, ZMQ radio, no DPDK/UHD) into the image
+`ocudu/gnb:mbs-local`.
 
 ### UEs: `oai-ue/`
 **OAI nrUE** (OpenAirInterface) with MBS receive patches. It decodes the
@@ -192,6 +193,7 @@ They come from OAI's own OCUDU + OAI ZMQ test
 | Path | What it is |
 |---|---|
 | `docs/virtual-mbs.sh` | **Entry point**: `build`, `up`, `activate`, `logs`, `down` |
+| `OCUDU-gNB/docker/Dockerfile.gnb.zmq` | Lean OCUDU gNB image (only `gnb`, ZMQ radio) |
 | `oai-ue/docker/Dockerfile.nrUE.zmq.ubuntu` | Lean OAI nrUE + ZMQ image (built on OAI's `ran-base`) |
 | `5G-MAG-Core/compose-files/internal/docker-compose.yaml` | Core network + test AF/AS |
 | `5G-MAG-Core/compose-files/internal/docker-compose.ocudu-gnb.yaml` | Adds the OCUDU gNB |
@@ -230,7 +232,7 @@ connection sharing, close the shared connection first: `ssh -O exit <host>`.
 
 ```bash
 cd docs
-OCUDU_GNB_NUM_JOBS=12 ./virtual-mbs.sh build   # gNB, OAI UE and broker images (long first time)
+./virtual-mbs.sh build                         # gNB, OAI UE and broker images (long first time)
 ./virtual-mbs.sh up                            # core + subscribers, then broker, gNB, UEs
 ./virtual-mbs.sh logs zmq_broker               # DL/UL block counters should increase
 ./virtual-mbs.sh logs oai_nrue_1               # cell found, registration, PDU session

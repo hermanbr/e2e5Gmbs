@@ -31,6 +31,11 @@ x-oai-nrue: &oai-nrue
 
 services:
   ocudu_gnb_with_mbs:
+    build:
+      # Lean build: only the gnb app with ZMQ (no DPDK/UHD/CU-DU splits).
+      dockerfile: docker/Dockerfile.gnb.zmq
+      args:
+        NUM_JOBS: ${OCUDU_GNB_NUM_JOBS:-}
     cpuset: ${OCUDU_GNB_CPUSET:-2-7}
     volumes:
       # Host bind instead of the named volume so docs/activate-*.sh can read the gNB log.
