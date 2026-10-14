@@ -380,6 +380,17 @@ static bool is_window_valid(NR_UE_MAC_INST_t *mac, int window_slots, int abs_slo
   return true;
 }
 
+// MTCH DCIs (G-RNTI) are sent in the same search space the OCUDU gNB scheduler uses for MBS:
+// the paging search space if configured, otherwise the first common search space.
+static const NR_SearchSpace_t *get_mbs_search_space(const NR_UE_MAC_INST_t *mac, const NR_BWP_PDCCH_t *pdcch_config)
+{
+  if (pdcch_config->paging_SS_id > -1)
+    return get_common_search_space(mac, pdcch_config->paging_SS_id);
+  if (pdcch_config->list_common_SS.count > 0)
+    return pdcch_config->list_common_SS.array[0];
+  return mac->search_space_zero;
+}
+
 static bool monitor_dci_for_other_SI(NR_UE_MAC_INST_t *mac,
                                      const NR_SearchSpace_t *ss,
                                      const int si_idx,
@@ -510,8 +521,6 @@ void ue_dci_configuration(NR_UE_MAC_INST_t *mac, fapi_nr_dl_config_request_t *dl
       if (is_ss_monitor_occasion(frame, slot, slots_per_frame, ss)) {
         config_dci_pdu(mac, dl_config, TYPE_C_RNTI_, slot, ss);
         configured_fallback_dci |= (ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common);
-        if (mac->mbs.enabled && ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common)
-          config_dci_pdu(mac, dl_config, TYPE_G_RNTI_, slot, ss);
       }
     }
     const NR_SearchSpace_t *css = NULL;
@@ -529,8 +538,11 @@ void ue_dci_configuration(NR_UE_MAC_INST_t *mac, fapi_nr_dl_config_request_t *dl
         css = mac->search_space_zero;
       AssertFatal(css, "Atleast one CSS should be present in connected state\n");
       config_dci_pdu(mac, dl_config, TYPE_C_RNTI_, slot, css);
-      if (mac->mbs.enabled)
-        config_dci_pdu(mac, dl_config, TYPE_G_RNTI_, slot, css);
+    }
+    if (mac->mbs.enabled) {
+      const NR_SearchSpace_t *mbs_ss = get_mbs_search_space(mac, pdcch_config);
+      if (is_ss_monitor_occasion(frame, slot, slots_per_frame, mbs_ss))
+        config_dci_pdu(mac, dl_config, TYPE_G_RNTI_, slot, mbs_ss);
     }
   }
 }

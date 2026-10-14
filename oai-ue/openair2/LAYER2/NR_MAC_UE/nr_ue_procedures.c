@@ -60,7 +60,8 @@ const uint16_t table_7_2_1[16] = {
     1920, // row index 13
 };
 
-static void nr_ue_mbs_deliver_payload(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, uint8_t lcid, const uint8_t *buf, int len)
+// Forwards one MBS SDU (the GTP-U payload sent by the AF/AS) to the dump file and/or UDP target.
+static void nr_ue_mbs_deliver_sdu(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, uint8_t lcid, const uint8_t *buf, int len)
 {
   if (len <= 0)
     return;
@@ -120,6 +121,61 @@ static void nr_ue_mbs_deliver_payload(NR_UE_MAC_INST_t *mac, frame_t frame, int 
     else
       LOG_W(NR_MAC, "Invalid OAI_NRUE_MBS_UDP IPv4 address '%s'\n", target);
     close(fd);
+  }
+}
+
+// Strips the PDCP data PDU header (no integrity/ciphering on MRBs) from a reassembled RLC SDU.
+static void nr_ue_mbs_deliver_pdcp_pdu(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, uint8_t lcid, const uint8_t *buf, int len)
+{
+  const int hdr_len = mac->mbs.pdcp_sn_bits == 18 ? 3 : 2;
+  if (len <= hdr_len || !(buf[0] & 0x80)) {
+    LOG_W(NR_MAC, "[UE %d] Dropping NR MBS PDCP PDU: len %d, not a data PDU or too short\n", mac->ue_id, len);
+    return;
+  }
+  nr_ue_mbs_deliver_sdu(mac, frame, slot, lcid, buf + hdr_len, len - hdr_len);
+}
+
+// RLC UM receive for the MTCH (TS 38.322 6.2.2.3): full SDUs pass through, segments are reassembled in order.
+// Broadcast MTCH has no HARQ feedback, so a lost segment simply drops the SDU it belongs to.
+static void nr_ue_mbs_deliver_payload(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, uint8_t lcid, const uint8_t *buf, int len)
+{
+  nr_ue_mbs_config_t *mbs = &mac->mbs;
+  if (len < 1)
+    return;
+  const int si = buf[0] >> 6; // 00 full SDU, 01 first, 10 last, 11 middle segment
+  if (si == 0) {
+    nr_ue_mbs_deliver_pdcp_pdu(mac, frame, slot, lcid, buf + 1, len - 1);
+    return;
+  }
+
+  const bool sn12 = mbs->rlc_sn_bits == 12;
+  const bool has_so = si != 1;
+  const int hdr_len = (sn12 ? 2 : 1) + (has_so ? 2 : 0);
+  if (len <= hdr_len)
+    return;
+  const int sn = sn12 ? ((buf[0] & 0x0f) << 8) | buf[1] : buf[0] & 0x3f;
+  const int so = has_so ? (buf[hdr_len - 2] << 8) | buf[hdr_len - 1] : 0;
+  const uint8_t *data = buf + hdr_len;
+  const int data_len = len - hdr_len;
+
+  if (si == 1) {
+    mbs->reasm_sn = sn;
+    mbs->reasm_len = 0;
+  } else if (sn != mbs->reasm_sn || so != mbs->reasm_len) {
+    LOG_W(NR_MAC, "[UE %d] Dropping NR MBS RLC segment SN %d SO %d (expected SN %d SO %d)\n", mac->ue_id, sn, so, mbs->reasm_sn, mbs->reasm_len);
+    mbs->reasm_sn = -1;
+    return;
+  }
+  if (mbs->reasm_len + data_len > NR_UE_MBS_MAX_SDU_SIZE) {
+    LOG_W(NR_MAC, "[UE %d] Dropping NR MBS SDU SN %d: larger than %d bytes\n", mac->ue_id, sn, NR_UE_MBS_MAX_SDU_SIZE);
+    mbs->reasm_sn = -1;
+    return;
+  }
+  memcpy(mbs->reasm_buf + mbs->reasm_len, data, data_len);
+  mbs->reasm_len += data_len;
+  if (si == 2) {
+    mbs->reasm_sn = -1;
+    nr_ue_mbs_deliver_pdcp_pdu(mac, frame, slot, lcid, mbs->reasm_buf, mbs->reasm_len);
   }
 }
 
