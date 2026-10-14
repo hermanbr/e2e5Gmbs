@@ -73,9 +73,13 @@ locally (only the `gnb` app, ZMQ radio, no DPDK/UHD) into the image
 `ocudu/gnb:mbs-local`.
 
 ### UEs: `oai-ue/`
-**OAI nrUE** (OpenAirInterface) with MBS receive patches. It decodes the
-G-RNTI given by `OAI_NRUE_MBS_G_RNTI` and forwards each received MBS packet to
-the UDP address in `OAI_NRUE_MBS_UDP`. It uses OAI's ZMQ radio driver
+**OAI nrUE** (OpenAirInterface) with MBS receive patches. It monitors the
+G-RNTI given by `OAI_NRUE_MBS_G_RNTI` in the same search space the gNB uses for
+MBS (the paging search space), reassembles the RLC UM segments, strips the
+PDCP header and forwards each MBS packet, exactly as the AF/AS sent it, to
+the UDP address in `OAI_NRUE_MBS_UDP`. The UE does not decode MCCH, so the MRB
+layout comes from `OAI_NRUE_MBS_RLC_SN_BITS` (default 6) and
+`OAI_NRUE_MBS_PDCP_SN_BITS` (default 12), matching OCUDU's defaults. It uses OAI's ZMQ radio driver
 (`oai_zmqdevif`), which follows the same ZMQ convention as OCUDU, so the two
 can exchange samples. Built locally into the image `oai-nr-ue:mbs-local`.
 
@@ -149,7 +153,8 @@ UE_i REQ
   antenna. UEs are told apart the normal 5G way (different timing, resources
   and identities), so the gNB sees several UEs on one cell.
 - **No clock:** a ZMQ link has no hardware clock. If the host is slow, the
-  whole simulation runs slower than real time instead of losing samples.
+  whole simulation runs slower than real time instead of losing samples
+  (with gNB + 2 UEs on 16 cores, roughly 1/10 of real time).
 - **No reconnects:** OAI cannot reconnect a ZMQ link once it has started.
   Always start and stop the broker, gNB and UEs **together**.
 
@@ -184,7 +189,9 @@ They come from OAI's own OCUDU + OAI ZMQ test
 4. The gNB schedules the content on the **MTCH** with G-RNTI `0xfe01`
    (`MTCH|PDCCH|PDSCH: rnti=0xfe01` in the gNB log). Every UE decodes the same
    transmission.
-5. Each UE forwards the decoded payload to the host (`10.33.33.1:5001`, `:5002`, …).
+5. Each UE reassembles the RLC segments, strips the PDCP header and forwards
+   the payload to the host (`10.33.33.1:5001`, `:5002`, …). The host gets
+   exactly the bytes the AF/AS put in each GTP-U packet.
 
 ---
 
@@ -244,6 +251,17 @@ ffplay udp://0.0.0.0:5001                      # ...when MODE=video
 
 The gNB log is at `logs/ocudu-gnb/ocudu_gnb_mbs.log`.
 
+### Verifying the data paths
+
+| Path | Check | Expected |
+|---|---|---|
+| Radio (ZMQ) | `./virtual-mbs.sh logs zmq_broker` | DL/UL counters keep increasing |
+| Attach + PDU session | `docker logs oai_nrue_1 \| grep 'UE IPv4'` | `Received PDU Session Establishment Accept, UE IPv4: 10.45.0.x` |
+| Unicast UL+DL (UE ⇄ UPF) | `sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' oai_nrue_1) -n ping -I oaitun_ue1 -c 5 10.45.0.1` | 0% loss (the UE image has no `ping`, so this uses the host's) |
+| MBS on the gNB | `grep 'MTCH: rnti=0xfe01' logs/ocudu-gnb/ocudu_gnb_mbs.log` | one line per scheduled MTCH grant |
+| MBS on each UE | `docker logs oai_nrue_1 \| grep 'MTCH SDU'` | one line per received packet, same counts on every UE |
+| MBS to the host | `nc -ul 5001` / `sudo tcpdump -ni br-5g-mag udp dst port 5001 or udp dst port 5002 -A` | `testMsg N Tx_ns=…` on both ports, or 1316-byte MPEG-TS packets with `MODE=video` |
+
 ---
 
 ## 9. Adding more UEs
@@ -270,6 +288,9 @@ actually start.
 | gNB never connects to the AMF | `sctp` module not loaded on the host. |
 | Broker shows no DL progress | One of the configured UEs is not running (see section 9). |
 | UE never finds the cell | Cell settings and UE options don't match; check the gNB's SSB position against `--ssb`. |
+| UE aborts with `NTN cell, but SIB19 not configured` | Old gNB image: SIB1 marked the cell as NTN when SIB20 was scheduled. Rebuild the gNB (`./virtual-mbs.sh build`). |
+| Radio stalls (gNB log `zmq: Waiting for data`) right after the first MBS packet | Old gNB image with the MTCH bearer deadlock. Rebuild the gNB. |
+| gNB logs `MTCH: rnti=0xfe01` but UEs log no `MTCH SDU` | Old UE image that looked for G-RNTI in the wrong search space. Rebuild the UE. |
 | UE finds the cell but registration fails | IMSI not in MongoDB, or K/OPc mismatch; rerun `up` or check `docker logs amf_with_mbs`. |
 | Registration times out | Host too slow (simulation far below real time): fewer UEs, or more cores. |
 | Everything stalls after restarting one container | ZMQ links can't reconnect: run `down` and `up` again. |
