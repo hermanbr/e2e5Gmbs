@@ -13,6 +13,7 @@
 #include "ocudu/du/du_high/du_manager/cbs/cbs_encoder.h"
 #include "ocudu/ran/band_helper.h"
 #include "ocudu/ran/sib/system_info_config.h"
+#include <algorithm>
 
 using namespace ocudu;
 using namespace odu;
@@ -449,9 +450,17 @@ static asn1::rrc_nr::sib1_s make_asn1_rrc_cell_sib1(const du_cell_config& du_cfg
           sib1.non_crit_ext.non_crit_ext_present                                  = true;
           sib1.non_crit_ext.non_crit_ext.non_crit_ext_present                     = true;
           sib1.non_crit_ext.non_crit_ext.non_crit_ext.si_sched_info_v1700_present = true;
-          sib1.non_crit_ext.non_crit_ext.non_crit_ext.cell_barred_ntn_r17_present = true;
-          sib1.non_crit_ext.non_crit_ext.non_crit_ext.cell_barred_ntn_r17 =
-              sib1_v1700_ies_s::cell_barred_ntn_r17_opts::not_barred;
+          // cellBarredNTN-r17 marks an NTN cell, so only signal it when SIB19 is broadcast (not for SIB20/MBS).
+          bool has_sib19 = std::any_of(
+              asn1_si_r17.sib_map_info_r17.begin(), asn1_si_r17.sib_map_info_r17.end(), [](const auto& info) {
+                return info.sib_type_r17.type1_r17().value ==
+                       sib_type_info_v1700_s::sib_type_r17_c_::type1_r17_opts::sib_type19;
+              });
+          if (has_sib19) {
+            sib1.non_crit_ext.non_crit_ext.non_crit_ext.cell_barred_ntn_r17_present = true;
+            sib1.non_crit_ext.non_crit_ext.non_crit_ext.cell_barred_ntn_r17 =
+                sib1_v1700_ies_s::cell_barred_ntn_r17_opts::not_barred;
+          }
           auto& si_sched_info_r17 = sib1.non_crit_ext.non_crit_ext.non_crit_ext.si_sched_info_v1700;
           si_sched_info_r17.sched_info_list2_r17.push_back(asn1_si_r17);
         }
