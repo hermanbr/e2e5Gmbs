@@ -148,6 +148,9 @@ private:
     std::map<uint16_t, mbs_mrb_bearer> mrbs;
   };
 
+  /// Executor for the MRB PDCP/RLC entities. They are only accessed from tasks already running on cell_exec, so they
+  /// must not dispatch back to cell_exec (a blocking executor in ZMQ mode, which would deadlock the cell).
+  inline_task_executor                    mbs_mrb_exec;
   std::map<std::string, mbs_cell_context> mbs_contexts;
 };
 

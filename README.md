@@ -712,6 +712,16 @@ local OAI build path. Keep these items consistent across UEs:
 - Matching RF band/frequency/numerology.
 - MBS G-RNTI `0xfe01`.
 
+## Virtual Testbed (ZMQ, no SDR)
+The whole chain also runs on one host without radios: the core, the OCUDU gNB
+and several OAI nrUEs run as Docker containers and exchange radio samples over
+ZMQ through a small broker. See **[VIRTUAL-TESTBED.md](VIRTUAL-TESTBED.md)** for
+the architecture, how the parts connect, and how to run it:
+```bash
+cd ~/e2e5Gmbs/docs
+./virtual-mbs.sh build && ./virtual-mbs.sh up && ./virtual-mbs.sh activate
+```
+
 ## Verification Checklist
 Core state:
 ```bash

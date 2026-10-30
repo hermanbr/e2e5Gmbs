@@ -428,8 +428,8 @@ void mac_cell_processor::handle_mbs_context_setup(const mac_mbs_context_setup_re
           mrb_id,
           get_mbs_mrb_config_or_default(request, mrb_id),
           timers,
-          cell_exec,
-          cell_exec,
+          mbs_mrb_exec,
+          mbs_mrb_exec,
           [this, session_key = request.session_key, mrb_id](const rlc_buffer_state& bs) {
             sched.handle_mbs_buffer_state_update({session_key, mrb_id, bs.pending_bytes});
           });

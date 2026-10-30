@@ -59,6 +59,11 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   memset(&mac->ul_time_alignment, 0, sizeof(mac->ul_time_alignment));
   memset(&mac->ssb_list, 0, sizeof(mac->ssb_list));
   memset(&mac->mbs, 0, sizeof(mac->mbs));
+  mac->mbs.reasm_sn = -1;
+  const char *rlc_sn = getenv("OAI_NRUE_MBS_RLC_SN_BITS");
+  mac->mbs.rlc_sn_bits = rlc_sn && atoi(rlc_sn) == 12 ? 12 : 6;
+  const char *pdcp_sn = getenv("OAI_NRUE_MBS_PDCP_SN_BITS");
+  mac->mbs.pdcp_sn_bits = pdcp_sn && atoi(pdcp_sn) == 18 ? 18 : 12;
 
   const char *mbs_g_rnti = getenv("OAI_NRUE_MBS_G_RNTI");
   if (mbs_g_rnti) {

@@ -515,11 +515,20 @@ typedef struct {
   A_SEQUENCE_OF(si_schedinfo_config_t) si_SchedInfo_list;
 } si_schedInfo_t;
 
+#define NR_UE_MBS_MAX_SDU_SIZE 9000
+
 typedef struct {
   bool enabled;
   uint16_t g_rnti;
   uint64_t rx_pdus;
   uint64_t rx_bytes;
+  // MRB layout: the UE does not decode MCCH, so these default to the OCUDU MRB config (RLC UM 6-bit SN, PDCP 12-bit SN)
+  int rlc_sn_bits;
+  int pdcp_sn_bits;
+  // RLC UM reassembly of the SDU currently being received
+  int reasm_sn; // -1 when no SDU is in progress
+  int reasm_len;
+  uint8_t reasm_buf[NR_UE_MBS_MAX_SDU_SIZE];
 } nr_ue_mbs_config_t;
 
 /*!\brief Top level UE MAC structure */
